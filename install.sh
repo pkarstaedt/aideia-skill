@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stable entrypoint for the forthcoming Linux Codex/Hermes installer.
 # Replace this placeholder with the actual installer at this same path.
-# See README.md for the handoff and skills/aideia/ for the skill source.
+# See README.md for setup and skills/aideia/ for the skill source.
 # This placeholder must not prompt for secrets or change client configuration.
 set -eu
 

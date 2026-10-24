@@ -1,67 +1,67 @@
-# Aideia skill
+# Aideia for your AI agent
 
-Portable guidance for agents using a connected Aideia account through MCP.
+Use your Aideia information with Codex or Hermes: review your day, explore recent patterns, save journal entries, and set reminders through the tools you choose to enable.
 
-**Status:** initial content draft (`0.1.0-dev`). `install.sh` is a non-installing placeholder for the separate installer implementation. This repository does not yet contain a working installer, a Codex plugin package, or a verified fresh-device setup. No stable release has been published.
+Aideia's MCP connection gives your agent access to those tools. The optional **Aideia skill** adds workflows and best practices for using them together.
 
-## Contents
+## Get connected
 
-```text
-skills/aideia/
-├── SKILL.md
-├── references/workflows.md
-└── agents/openai.yaml
-```
+You need an Aideia account and Codex or Hermes installed on your machine.
 
-`SKILL.md` is the entrypoint. It explains when to use Aideia and how to interpret records or make requested changes. The workflow reference provides examples for sleep and activity reviews, daily comparisons, schedules, journaling, and reminders. The optional Codex metadata supplies the skill's display information.
+1. In Aideia's Preferences, enable **External agents** in the Aideia integrations area.
+2. Open **External agents** under Apps and choose the tools and operations your agent can use.
+3. Create an access token and copy the MCP server URL.
+4. Configure that URL and bearer token in your agent, then install the skill if you want the additional guidance.
 
-Live MCP descriptions and schemas remain authoritative for tool availability, arguments, and results. This repository deliberately does not maintain another tool catalog. The skill grants no access and contains no user credentials.
+Aideia hosts the MCP server. On a headless machine, you can create the token from another device and configure the connection without opening a browser on the agent's machine.
 
-## Connection and distribution
+### Guided Linux setup — coming soon
 
-Aideia hosts the MCP server. Clients need its external URL and an Aideia-issued token configured separately; they do not install or run the Aideia server locally.
-
-The intended client scope is Codex and Hermes. OpenClaw packaging is deferred. Start from the same `skills/aideia/` directory when preparing client packages so workflow guidance has one maintained source. Use a release tag or commit to identify an exact source version rather than assuming that `main` is a stable release.
-
-The current external-access design excludes internal memory tools. Other capabilities depend on what the Aideia platform exposes and what the user permits. Do not treat an example in this skill as a promise of access.
-
-## Installer handoff
-
-A separate implementation will replace the root `install.sh` placeholder at the same path. The stable download URL is:
-
-https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh
-
-The following command downloads the script and runs it with terminal input available for the eventual interactive prompts:
+The shared setup entrypoint for Codex and Hermes is:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh -o aideia-install.sh && bash aideia-install.sh
 ```
 
-**Currently this exits with a message and a nonzero status without changing configuration.** It does not install anything or ask for a token. The URL follows `main` and is not a pinned stable release.
+The script currently displays an availability message. Guided setup will configure the connection and offer skill installation.
 
-The actual installer is expected to configure the remote MCP connection for supported detected clients, prompt securely for the token, and offer installation of this skill.
+## Install the skill separately
 
-For that implementation:
+If your MCP connection is already configured, you can add the skill independently.
 
-- The source skill directory is `skills/aideia/`; install the entire directory, including its relative workflow reference. Keep the installed folder name `aideia` consistent with the frontmatter.
-- Use the user's actual external MCP URL. Do not invent a deployment hostname or package a private development endpoint.
-- Keep credentials in the client's supported secret configuration, outside the skill and repository. Do not print or commit the token.
-- Keep existing client configuration intact and avoid duplicate Aideia connections or duplicate skill registrations when rerun.
-- Codex plugin packaging and the installer can use this same source skill without maintaining a second copy by hand.
+**Codex:** ask its skill installer to install from this directory:
 
-These points describe the handoff; they do not implement or claim installer behavior.
+```text
+$skill-installer install https://github.com/pkarstaedt/aideia-skill/tree/main/skills/aideia
+```
 
-## Direct links
+**Hermes:** install from the skill's entrypoint:
 
-- [Skill entrypoint](https://github.com/pkarstaedt/aideia-skill/blob/main/skills/aideia/SKILL.md)
-- [Raw skill entrypoint](https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/skills/aideia/SKILL.md)
-- [Download repository source ZIP](https://github.com/pkarstaedt/aideia-skill/archive/refs/heads/main.zip) — the skill is inside `skills/aideia/`; this is not a skill-only release archive.
-- [Installer script](https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh) — placeholder until implementation is complete.
+```bash
+hermes skills install https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/skills/aideia/SKILL.md
+```
 
-## Verification status
+Start a new agent session after installation. You can use the MCP tools without installing the skill.
 
-The initial content is checked for skill format and relative references. This does not establish whether the guidance is effective in a live agent session.
+## Try it
 
-The requested fresh-device target is a **Linux headless machine**. A complete check remains pending until the installer and an authenticated external MCP endpoint are available. It needs to establish that the client detects the installed skill, resolves its supporting reference, connects using its configured token, and completes an authorized task. Keep write checks to explicitly requested disposable data.
+Ask your agent to use Aideia for something you have enabled:
 
-Public distribution is still a draft. Repository publication does not imply marketplace approval, a working download service, or tested compatibility with every client version.
+- “Show my most recent sleep information and tell me which day it covers.”
+- “Compare my activity over the last three days. Point out any missing information.”
+- “Save this as my journal entry: …”
+- “Remind me to call the dentist tomorrow at 10.”
+
+The skill helps the agent distinguish current state from historical records, preserve your exact journal text, and explain incomplete information. Available actions follow the permissions you set in Aideia.
+
+## Manage access
+
+Revoke a token in the External agents app to disconnect an installation. Disable External agents to pause all external access. Keep your token private; it belongs in your agent's connection settings, not in the skill files.
+
+## Explore the skill
+
+- [Skill instructions](skills/aideia/SKILL.md)
+- [Workflow examples](skills/aideia/references/workflows.md)
+- [Download source ZIP](https://github.com/pkarstaedt/aideia-skill/archive/refs/heads/main.zip) — the skill is in `skills/aideia/`.
+
+Tool names, arguments, and descriptions come from the live MCP connection. The workflow guidance here complements that interface.
