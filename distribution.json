@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "release_ref": null,
+  "skill_version": "0.1.0-dev",
+  "codex": {
+    "marketplace_source": null,
+    "marketplace_name": null,
+    "plugin_id": null
+  },
+  "hermes": {"skill_url": null}
+}
