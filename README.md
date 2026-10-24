@@ -2,7 +2,7 @@
 
 Portable guidance for agents using a connected Aideia account through MCP.
 
-**Status:** initial content draft (`0.1.0-dev`). This repository does not yet contain an installer, a Codex plugin package, or a verified fresh-device setup. No stable release has been published.
+**Status:** initial content draft (`0.1.0-dev`). `install.sh` is a non-installing placeholder for the separate installer implementation. This repository does not yet contain a working installer, a Codex plugin package, or a verified fresh-device setup. No stable release has been published.
 
 ## Contents
 
@@ -27,7 +27,19 @@ The current external-access design excludes internal memory tools. Other capabil
 
 ## Installer handoff
 
-A separate implementation will add an installation script to this repository. It is expected to configure the remote MCP connection for supported detected clients, prompt securely for the token, and offer installation of this skill. No script or installer command exists yet.
+A separate implementation will replace the root `install.sh` placeholder at the same path. The stable download URL is:
+
+https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh
+
+The following command downloads the script and runs it with terminal input available for the eventual interactive prompts:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh -o aideia-install.sh && bash aideia-install.sh
+```
+
+**Currently this exits with a message and a nonzero status without changing configuration.** It does not install anything or ask for a token. The URL follows `main` and is not a pinned stable release.
+
+The actual installer is expected to configure the remote MCP connection for supported detected clients, prompt securely for the token, and offer installation of this skill.
 
 For that implementation:
 
@@ -38,6 +50,13 @@ For that implementation:
 - Codex plugin packaging and the installer can use this same source skill without maintaining a second copy by hand.
 
 These points describe the handoff; they do not implement or claim installer behavior.
+
+## Direct links
+
+- [Skill entrypoint](https://github.com/pkarstaedt/aideia-skill/blob/main/skills/aideia/SKILL.md)
+- [Raw skill entrypoint](https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/skills/aideia/SKILL.md)
+- [Download repository source ZIP](https://github.com/pkarstaedt/aideia-skill/archive/refs/heads/main.zip) — the skill is inside `skills/aideia/`; this is not a skill-only release archive.
+- [Installer script](https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh) — placeholder until implementation is complete.
 
 ## Verification status
 
