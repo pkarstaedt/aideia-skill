@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aideia"
+  short_description: "Work with your connected Aideia records and actions"
+  default_prompt: "Use $aideia to work with my connected Aideia information and permitted actions."
