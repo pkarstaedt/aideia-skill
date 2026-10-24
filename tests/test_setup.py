@@ -7,6 +7,7 @@ import select
 import ssl
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -96,7 +97,11 @@ def mcp_server(tmp_path, monkeypatch):
     server.socket = context.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    monkeypatch.setenv("SSL_CERT_FILE", str(cert))
+    # Retain normal roots for dependency downloads while trusting the MCP fixture.
+    trust = tmp_path / "trust.pem"
+    roots = ssl.create_default_context().get_ca_certs(binary_form=True)
+    trust.write_text("".join(ssl.DER_cert_to_PEM_cert(root) for root in roots) + cert.read_text())
+    monkeypatch.setenv("SSL_CERT_FILE", str(trust))
     MCPHandler.requests = []
     MCPHandler.reject = False
     MCPHandler.fail_tool_list = False
@@ -252,16 +257,19 @@ def test_unreleased_script_refuses_to_run_from_a_piped_checkout():
     assert "no immutable release is published" in result.stderr
 
 
-def run_interactive_setup(tmp_path, mcp_url, answers, home=None):
+def run_interactive_setup(tmp_path, mcp_url, answers, home=None, *, command=None, extra_env=None):
     fake_bin = tmp_path / "bin"
-    fake_bin.mkdir(parents=True)
+    fake_bin.mkdir(parents=True, exist_ok=True)
     fake_codex = fake_bin / "codex"
     fake_codex.write_text("#!/bin/sh\necho 'codex 1.2.3'\n")
     fake_codex.chmod(0o755)
     codex_home = home or tmp_path / "custom-codex"
     env = dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}", CODEX_HOME=str(codex_home))
+    env.update(extra_env or {})
     pid, descriptor = pty.fork()
     if pid == 0:
+        if command:
+            os.execve("/bin/bash", ["bash", "-c", command], env)
         os.execve(sys.executable, [sys.executable, str(ROOT / "installer/setup.py"), "--repo-root", str(ROOT), "--client", "codex"], env)
     output = bytearray()
     pending = [
@@ -269,7 +277,7 @@ def run_interactive_setup(tmp_path, mcp_url, answers, home=None):
         (b"Paste your Aideia access token", b"integration-token-!@#$\n"),
         *answers,
     ]
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + 60
     status = None
     try:
         while time.monotonic() < deadline:
@@ -292,6 +300,9 @@ def run_interactive_setup(tmp_path, mcp_url, answers, home=None):
             raise AssertionError(f"interactive setup timed out: {output.decode(errors='replace')}")
     finally:
         os.close(descriptor)
+        if status is None:
+            os.kill(pid, 15)
+            os.waitpid(pid, 0)
     return os.waitstatus_to_exitcode(status), output.decode(errors="replace"), codex_home
 
 
@@ -358,3 +369,91 @@ def test_no_terminal_exits_before_discovery_or_configuration():
     )
     assert result.returncode != 0
     assert "needs a terminal" in result.stderr
+
+
+PUBLIC_INSTALL_COMMAND = "curl -fsSL https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh | bash"
+
+
+@pytest.fixture
+def installer_downloads(tmp_path):
+    """Serve real source files through curl's download interface, pinned to one SHA."""
+    archive = tmp_path / "source.tar.gz"
+    revision = "a" * 40
+    with tarfile.open(archive, "w:gz") as bundle:
+        for relative in ["setup.sh", "installer/setup.py", "installer/requirements.lock", "distribution.json"]:
+            bundle.add(ROOT / relative, arcname=f"aideia-skill-{revision}/{relative}")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    (fake_bin / "python3").symlink_to(Path(sys.executable).resolve())
+    curl = fake_bin / "curl"
+    curl.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\nfrom pathlib import Path\n"
+        f"root = Path({str(ROOT)!r})\narchive = Path({str(archive)!r})\n"
+        "args = sys.argv[1:]\nurl = next(arg for arg in args if arg.startswith('https://'))\n"
+        f"if url == 'https://api.github.com/repos/pkarstaedt/aideia-skill/commits/main': data = json.dumps({{'sha': {revision!r}}}).encode()\n"
+        f"elif url == 'https://github.com/pkarstaedt/aideia-skill/archive/{revision}.tar.gz': data = archive.read_bytes()\n"
+        "elif url == 'https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh': data = (root / 'install.sh').read_bytes()\n"
+        "else: raise SystemExit(22)\n"
+        "if '-o' in args: Path(args[args.index('-o') + 1]).write_bytes(data)\n"
+        "else: sys.stdout.buffer.write(data)\n"
+    )
+    curl.chmod(0o755)
+    hermes = fake_bin / "hermes"
+    hermes.write_text("#!/bin/sh\necho 'Hermes fixture 1.0'\n")
+    hermes.chmod(0o755)
+    installer_temp = tmp_path / "installer-temp"
+    installer_temp.mkdir()
+    return {
+        "HERMES_HOME": str(tmp_path / "custom-hermes"),
+        "TMPDIR": str(installer_temp),
+        "PIP_CACHE_DIR": str(tmp_path / "pip-cache"),
+    }
+
+
+@pytest.mark.parametrize("choice,clients", [(b"1\n", ["codex"]), (b"2\n", ["hermes"]), (b"b\n", ["codex", "hermes"])])
+def test_public_pipe_installs_selected_clients(mcp_server, tmp_path, installer_downloads, choice, clients):
+    answers = [(b"Choose Codex, Hermes, or both", choice)]
+    if len(clients) == 2:
+        answers.append((b"Use the same token for both", b"y\n"))
+    result, output, codex_home = run_interactive_setup(
+        tmp_path, mcp_server, answers, command=PUBLIC_INSTALL_COMMAND, extra_env=installer_downloads
+    )
+    assert result == 0, output
+    assert "integration-token-!@#$" not in output
+    for client in clients:
+        path = codex_home / "config.toml" if client == "codex" else Path(installer_downloads["HERMES_HOME"]) / "config.yaml"
+        config, _ = setup.read_config(path, client)
+        entry = config["mcp_servers"]["aideia"]
+        assert entry["url"] == mcp_server
+        assert entry.get("http_headers", entry.get("headers"))["Authorization"] == "Bearer integration-token-!@#$"
+        assert path.stat().st_mode & 0o777 == 0o600
+    assert list(Path(installer_downloads["TMPDIR"]).iterdir()) == []
+    assert [request[0]["method"] for request in MCPHandler.requests] == ["initialize", "notifications/initialized", "tools/list"] * len(clients)
+
+
+def test_public_pipe_rejected_token_leaves_configs_unchanged(mcp_server, tmp_path, installer_downloads):
+    MCPHandler.reject = True
+    codex_home = tmp_path / "custom-codex"
+    codex_home.mkdir()
+    original = b"# Existing settings\nmodel = 'keep-me'\n"
+    (codex_home / "config.toml").write_bytes(original)
+    result, output, _ = run_interactive_setup(
+        tmp_path, mcp_server,
+        [(b"Choose Codex, Hermes, or both", b"1\n"), (b"Retry the read-only connection check", b"n\n")],
+        command=PUBLIC_INSTALL_COMMAND, extra_env=installer_downloads,
+    )
+    assert result != 0
+    assert "Setup canceled before any client file was changed" in output
+    assert [request[0]["method"] for request in MCPHandler.requests] == ["initialize"]
+    assert (codex_home / "config.toml").read_bytes() == original
+    assert not list(codex_home.glob("*.bak"))
+    assert "integration-token-!@#$" not in output
+    assert list(Path(installer_downloads["TMPDIR"]).iterdir()) == []
+
+
+def test_public_entrypoint_without_terminal_exits_before_downloads(tmp_path):
+    result = subprocess.run(["bash"], input=(ROOT / "install.sh").read_text(), text=True, capture_output=True, start_new_session=True, check=False)
+    assert result.returncode == 1
+    assert "needs a terminal" in result.stderr
+    assert "Downloading" not in result.stdout

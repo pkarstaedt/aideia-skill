@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Release packaging sets this to the immutable release tag; development source stays inert.
+# Release packaging sets the tag. install.sh can instead supply its resolved commit.
 AIDEIA_RELEASE_REF=""
+source_ref=""
+if [[ "${1:-}" == --source-ref ]]; then
+  source_ref="${2:-}"
+  if [[ ! "$source_ref" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' 'Installer source revision must be a complete Git commit.' >&2
+    exit 1
+  fi
+  shift 2
+fi
 script_path="${BASH_SOURCE[0]:-}"
 repo_root=""
 if [[ -n "$script_path" && -f "$script_path" ]]; then
@@ -32,7 +41,7 @@ if [[ -z "$repo_root" ]]; then
   repo_root="$tmp_dir/source"
 fi
 
-if [[ ! "$AIDEIA_RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ -z "$source_ref" && ! "$AIDEIA_RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   printf '%s\n' 'This is development source, not a versioned installer release.' >&2
   exit 1
 fi
@@ -42,14 +51,18 @@ if ! python3 -m venv "$tmp_dir/venv" >/dev/null 2>&1; then
   printf '%s\n' 'Install Python 3 with the venv module (often python3-venv), then rerun setup.' >&2
   exit 1
 fi
-if ! "$tmp_dir/venv/bin/python" - "$repo_root/distribution.json" "$AIDEIA_RELEASE_REF" <<'PY'
+if ! "$tmp_dir/venv/bin/python" - "$repo_root/distribution.json" "$AIDEIA_RELEASE_REF" "$source_ref" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as stream:
-    raise SystemExit(0 if json.load(stream).get("release_ref") == sys.argv[2] else 1)
+    metadata = json.load(stream)
+valid = metadata.get("schema_version") == 1
+if not sys.argv[3]:
+    valid = valid and metadata.get("release_ref") == sys.argv[2]
+raise SystemExit(0 if valid else 1)
 PY
 then
   printf '%s\n' 'Installer and distribution metadata do not match the same release.' >&2
   exit 1
 fi
 "$tmp_dir/venv/bin/python" -m pip install --disable-pip-version-check --no-input -r "$repo_root/installer/requirements.lock" >/dev/null
-"$tmp_dir/venv/bin/python" "$repo_root/installer/setup.py" --repo-root "$repo_root"
+"$tmp_dir/venv/bin/python" "$repo_root/installer/setup.py" --repo-root "$repo_root" "$@"

@@ -17,33 +17,35 @@ Aideia hosts the MCP server. On a headless machine, you can create the token fro
 
 ### Guided Linux setup
 
-The guided Linux installer is implemented for Codex CLI and Hermes, but there is not yet an immutable release. The development branch intentionally refuses to accept a token. A versioned release will provide this command:
+Run this command on the machine where Codex CLI or Hermes is installed:
 
 ```bash
-curl -fsSL "<VERSIONED_SETUP_SCRIPT_URL>" | bash
+curl -fsSL https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/install.sh | bash
 ```
 
-Do not replace the placeholder with a `main` branch URL. The release command will download the installer implementation and distribution metadata from the same versioned source. Codex or Hermes and Python 3 with its `venv` module must already be installed; the installer does not install system packages. It asks for the HTTPS MCP URL and reads the token from a hidden terminal prompt. It checks authentication and tool discovery without calling tools before saving a connection.
+Choose your installed client, paste the HTTPS MCP URL from Aideia, and enter your token at the hidden prompt. Setup checks the connection before saving it, preserves unrelated settings, and asks before replacing an existing Aideia connection. Your token is stored in the client's configuration with owner-only file permissions.
 
-Configuration is stored in the selected client's local config file with owner-only permissions. The optional Aideia skill is installed only when that release provides a verified client distribution channel. A skill installation problem does not remove a working MCP connection.
+You need `curl`, `tar`, and Python 3 with its `venv` module. Setup uses a temporary Python environment for the TOML/YAML configuration readers and removes it afterwards. It does not require uv or install system packages.
+
+The command downloads the current source and keeps its setup files on one Git commit. Start a new Codex or Hermes session after setup.
 
 ## Install the skill separately
 
-If your MCP connection is already configured, you can add the skill independently. No stable Codex plugin or versioned Hermes skill entrypoint is published yet.
+The MCP connection works without the optional skill. Packaged skill channels are not published yet; you can install the current source directly:
 
-**Codex:** use the skills-only plugin when its release channel is published. It adds guidance and does not add a second MCP connection.
+**Codex:** ask its skill installer to install this directory:
 
 ```text
-Plugin installation instructions will be added with the verified release.
+$skill-installer install https://github.com/pkarstaedt/aideia-skill/tree/main/skills/aideia
 ```
 
-**Hermes:** install the versioned skill entrypoint when it is published:
+**Hermes:** install from the skill entrypoint:
 
 ```bash
-<VERSIONED_HERMES_SKILL_URL>
+hermes skills install https://raw.githubusercontent.com/pkarstaedt/aideia-skill/main/skills/aideia/SKILL.md
 ```
 
-The command will be `hermes skills install <VERSIONED_HERMES_SKILL_URL>`. Start a new agent session after installation. You can use the MCP tools without installing the skill.
+Start a new session to load the skill. These source URLs follow the current `main` branch.
 
 ## Try it
 
@@ -67,9 +69,3 @@ Revoke a token in the External agents app to disconnect an installation. Disable
 - [Download source ZIP](https://github.com/pkarstaedt/aideia-skill/archive/refs/heads/main.zip) — the development source is in `skills/aideia/`.
 
 Tool names, arguments, and descriptions come from the live MCP connection. The workflow guidance here complements that interface.
-
-## Release status
-
-Current source version: `0.1.0-dev`. No stable installer or skill distribution is published. The setup implementation lives in `installer/setup.py`; `distribution.json` deliberately leaves release and client identifiers empty until matching artifacts have been tested. Do not run a main-branch installer with a real token.
-
-Before publishing the website instructions, supply and verify the immutable release tag, the versioned setup-script URL, the Codex marketplace source/name/plugin identifier, the Hermes skill URL, and the screenshot assets for the two Aideia setup steps. Confirm the public website path and domain with its owner. Until then the installer command and skill download controls remain unavailable.
